@@ -18,9 +18,11 @@ mod benchmarking;
 pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
+	use sp_std::prelude::*;
 
 	#[pallet::pallet]
 	#[pallet::generate_store(pub(super) trait Store)]
+	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -30,31 +32,33 @@ pub mod pallet {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 	}
 
-	// The pallet's runtime storage items.
-	// https://docs.substrate.io/main-docs/build/runtime-storage/
+	#[derive(Encode, Decode, Clone, PartialEq, Default, TypeInfo)]
+	pub struct UserInfo {
+		/// Username, stored as an array of bytes.
+		pub username: Vec<u8>,
+		/// Number id of the user.
+		pub id: i64,
+		/// The "About Me" section of the user.
+		pub about_me: Vec<u8>,
+	}
+    /// Mapping of account ids to UserInfo.
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/main-docs/build/runtime-storage/#declaring-storage-items
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn info)]
+	pub type AccountIdToUserInfo<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, UserInfo, ValueQuery>;
 
-	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/main-docs/build/events-errors/
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored { something: u32, who: T::AccountId },
+	  /// Indicates a user has been registered.
+		UserCreated { user: T::AccountId },
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		AboutMeTooLong,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -62,43 +66,25 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::call_index(0)]
+		// Dispatchable calls go here!
+		// Register a new user and change the state of the chain.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/main-docs/build/origins/
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
-			// Return a successful DispatchResultWithPostInfo
+		pub fn register_user(
+			origin: OriginFor<T>,
+			username: Vec<u8>,
+			id: i64,
+			about_me: Vec<u8>,
+		) -> DispatchResult {
+			// Gets the caller or signer of the function.
+			let sender = ensure_signed(origin)?;
+			// Define a new user in accordance to UserInfo.
+			let new_user = UserInfo { username, id, about_me };
+			// Change the state of our storage mapping by adding user info to our sender AccountId.
+			<AccountIdToUserInfo<T>>::insert(&sender, new_user);
+			// Emit an event indicating the user is now created and registered.
+			Self::deposit_event(Event::<T>::UserCreated { user: sender });
 			Ok(())
 		}
-
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::call_index(1)]
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1).ref_time())]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
-
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => return Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
-		}
 	}
+
 }
