@@ -33,32 +33,37 @@ pub mod pallet {
 	}
 
 	#[derive(Encode, Decode, Clone, PartialEq, Default, TypeInfo)]
-	pub struct UserInfo {
+	pub struct VoterInfo {
 		/// Username, stored as an array of bytes.
-		pub username: Vec<u8>,
+		pub name: Vec<u8>,
+		pub surname: Vec<u8>,
+		pub email: Vec<u8>,
+		pub dob: Vec<u8>,
+		pub phone: i64,
 		/// Number id of the user.
-		pub id: i64,
+		pub national_id: i64,
 		/// The "About Me" section of the user.
-		pub about_me: Vec<u8>,
+		pub address: Vec<u8>,
+		pub vote: Vec<u8>,
 	}
-    /// Mapping of account ids to UserInfo.
+    /// Mapping of account ids to VoterInfo.
 	#[pallet::storage]
 	#[pallet::getter(fn info)]
-	pub type AccountIdToUserInfo<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::AccountId, UserInfo, ValueQuery>;
+	pub type AccountIdToVoterInfo<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, VoterInfo, ValueQuery>;
 
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 	  /// Indicates a user has been registered.
-		UserCreated { user: T::AccountId },
+		VoterCreated { user: T::AccountId },
 	}
 
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
-		AboutMeTooLong,
+		UserInfoTooLong,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -69,20 +74,25 @@ pub mod pallet {
 		// Dispatchable calls go here!
 		// Register a new user and change the state of the chain.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn register_user(
+		pub fn register_voter(
 			origin: OriginFor<T>,
-			username: Vec<u8>,
-			id: i64,
-			about_me: Vec<u8>,
+		    name: Vec<u8>,
+		    surname: Vec<u8>,
+		    email: Vec<u8>,
+		    dob: Vec<u8>,
+		    phone: i64,
+		    national_id: i64,
+		    address: Vec<u8>,
+		    vote: Vec<u8>,
 		) -> DispatchResult {
 			// Gets the caller or signer of the function.
 			let sender = ensure_signed(origin)?;
-			// Define a new user in accordance to UserInfo.
-			let new_user = UserInfo { username, id, about_me };
+			// Define a new user in accordance to VoterInfo.
+			let new_user = VoterInfo { name, surname, email, dob, phone, national_id, address, vote };
 			// Change the state of our storage mapping by adding user info to our sender AccountId.
-			<AccountIdToUserInfo<T>>::insert(&sender, new_user);
+			<AccountIdToVoterInfo<T>>::insert(&sender, new_user);
 			// Emit an event indicating the user is now created and registered.
-			Self::deposit_event(Event::<T>::UserCreated { user: sender });
+			Self::deposit_event(Event::<T>::VoterCreated { user: sender });
 			Ok(())
 		}
 	}
